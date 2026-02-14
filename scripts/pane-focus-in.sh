@@ -16,6 +16,16 @@ tmux_unset_env() {
     tmux set-environment -gu "$1" 2>/dev/null || true
 }
 
+target_is_focused() {
+    local pane_id="$1"
+    local window_id="$2"
+    local pane_active window_active
+
+    pane_active=$(tmux display-message -p -t "$pane_id" '#{pane_active}' 2>/dev/null || true)
+    window_active=$(tmux display-message -p -t "$window_id" '#{window_active}' 2>/dev/null || true)
+    [ "$pane_active" = "1" ] && [ "$window_active" = "1" ]
+}
+
 restore_window_option() {
     local window_id="$1"
     local option="$2"
@@ -46,20 +56,6 @@ restore_window_title_style() {
     tmux_unset_env "$window_done_key"
 }
 
-restore_inactive_window_title_styles() {
-    local active_window_id="$1"
-    local line window_prefix target_window_id
-
-    while IFS= read -r line; do
-        [ -z "$line" ] && continue
-        window_prefix="${line%%_ORIG_STATUS_STYLE=*}"
-        target_window_id="${window_prefix#TMUX_AGENT_WINDOW_}"
-        [ -z "$target_window_id" ] && continue
-        [ "$target_window_id" = "$active_window_id" ] && continue
-        restore_window_title_style "$target_window_id"
-    done < <(tmux show-environment -g | rg '^TMUX_AGENT_WINDOW_.*_ORIG_STATUS_STYLE=' || true)
-}
-
 pane_id="${1:-}"
 window_id="${2:-}"
 if [ -z "$pane_id" ]; then
@@ -69,8 +65,10 @@ if [ -z "$window_id" ]; then
     window_id=$(tmux display-message -p -t "$pane_id" '#{window_id}')
 fi
 
-# Ensure title styles do not persist after switching away from a window.
-restore_inactive_window_title_styles "$window_id"
+# Ignore stale hook invocations that do not match the currently focused pane/window.
+if ! target_is_focused "$pane_id" "$window_id"; then
+    exit 0
+fi
 
 state_key="TMUX_AGENT_PANE_${pane_id}_STATE"
 agent_key="TMUX_AGENT_PANE_${pane_id}_AGENT"
@@ -97,6 +95,11 @@ if [ -z "$done_window" ]; then
 fi
 done_window_done_key="TMUX_AGENT_WINDOW_${done_window}_DONE"
 done_window_border_key="TMUX_AGENT_WINDOW_${done_window}_ORIG_ACTIVE_BORDER_STYLE"
+
+# Needs-input title style is cleared only when focus returns to the source pane/window.
+if [ "$state" = "needs-input" ]; then
+    restore_window_title_style "$window_id"
+fi
 
 if [ "$window_done" = "1" ] || [ "$state" = "done" ] || [ "$done_marker" = "1" ]; then
     restore_window_title_style "$done_window"

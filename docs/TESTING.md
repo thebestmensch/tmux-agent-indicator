@@ -77,7 +77,7 @@ tmux -L "$SOCK" run-shell "$PWD/scripts/pane-focus-in.sh \"$OTHER_PANE\" \"$OTHE
 tmux -L "$SOCK" show-window-options -vt "$WIN" | rg 'window-status'
 ```
 
-Window-switch title reset assertion (fails if stale style remains):
+Window-switch title reset assertion (fails if style clears before returning to source window, or does not clear after returning):
 
 ```bash
 set -euo pipefail
@@ -88,12 +88,18 @@ before_current_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-s
 [ -n "$before_current_style" ] || { echo "FAIL: window-status-current-style was not applied before switch"; exit 1; }
 
 tmux -L "$SOCK" run-shell "$PWD/scripts/pane-focus-in.sh \"$OTHER_PANE\" \"$OTHER_WIN\""
-after_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-style 2>/dev/null || true)"
-after_current_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-current-style 2>/dev/null || true)"
+while_away_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-style 2>/dev/null || true)"
+while_away_current_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-current-style 2>/dev/null || true)"
+[ -n "$while_away_style" ] || { echo "FAIL: window-status-style cleared before returning to source window"; exit 1; }
+[ -n "$while_away_current_style" ] || { echo "FAIL: window-status-current-style cleared before returning to source window"; exit 1; }
 
-[ -z "$after_style" ] || { echo "FAIL: stale window-status-style remains: $after_style"; exit 1; }
-[ -z "$after_current_style" ] || { echo "FAIL: stale window-status-current-style remains: $after_current_style"; exit 1; }
-echo "PASS: window title styles reset after switching windows"
+tmux -L "$SOCK" run-shell "$PWD/scripts/pane-focus-in.sh \"$PANE\" \"$WIN\""
+after_return_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-style 2>/dev/null || true)"
+after_return_current_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-status-current-style 2>/dev/null || true)"
+
+[ -z "$after_return_style" ] || { echo "FAIL: stale window-status-style remains after returning: $after_return_style"; exit 1; }
+[ -z "$after_return_current_style" ] || { echo "FAIL: stale window-status-current-style remains after returning: $after_return_current_style"; exit 1; }
+echo "PASS: window title styles reset only when returning to source window"
 ```
 
 Running animation assertion (fails if animation does not tick or cleanup):
@@ -156,7 +162,7 @@ rm -f /tmp/agent-indicator.out
    - `running/needs-input/done` apply only configured non-empty properties.
    - `off` resets pane background, border style, and window title style.
    - With `@agent-indicator-animation-enabled on`, running state animates the status indicator.
-   - Switching to another window clears title styling for the previous window (`needs-input` and `done`).
+   - Switching away keeps title styling; it clears when you focus the source pane/window again (`needs-input` and `done`).
    - With `@agent-indicator-reset-on-focus on`, done pane styling clears when focusing pane/window.
 4. Validate empty-value semantics (`set -g @agent-indicator-done-bg ''` should skip background changes).
 5. Validate status icon appears when agent state/process is active.
