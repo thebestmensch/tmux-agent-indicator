@@ -56,8 +56,8 @@ is_enabled() {
 default_state_bg() {
     case "$1" in
         running) printf 'default\n' ;;
-        needs-input) printf 'colour94\n' ;;
-        done) printf 'green\n' ;;
+        needs-input) printf 'default\n' ;;
+        done) printf 'default\n' ;;
         *) printf 'default\n' ;;
     esac
 }
@@ -191,6 +191,36 @@ pane_exists() {
     tmux display-message -p -t "$pane_id" '#{pane_id}' >/dev/null 2>&1
 }
 
+start_animation() {
+    local anim_enabled
+    anim_enabled=$(tmux_get_option_or_default "@agent-indicator-animation-enabled" "off")
+    if ! is_enabled "$anim_enabled"; then
+        return
+    fi
+
+    # Check if animation process is already alive.
+    local existing_pid
+    existing_pid=$(tmux_get_env "TMUX_AGENT_ANIMATION_PID")
+    if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+        return
+    fi
+
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    nohup bash "$script_dir/animation.sh" >/dev/null 2>&1 &
+    disown
+}
+
+stop_animation() {
+    local pid
+    pid=$(tmux_get_env "TMUX_AGENT_ANIMATION_PID")
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+    fi
+    tmux set-environment -gu TMUX_AGENT_ANIMATION_PID 2>/dev/null || true
+    tmux set-environment -gu TMUX_AGENT_ANIMATION_FRAME 2>/dev/null || true
+}
+
 resolve_target_pane() {
     local agent="$1"
     local pane=""
@@ -311,7 +341,44 @@ case "$state" in
 esac
 
 case "$state" in
-    running|needs-input)
+    running)
+        clear_window_title_style "$window_id"
+        tmux_unset_env "$done_key"
+        tmux_unset_env "$done_window_key"
+        tmux_unset_env "$pending_reset_key"
+        tmux_set_env "$state_key" "$state"
+        tmux_set_env "$agent_key" "$agent"
+        tmux_set_env "TMUX_AGENT_ACTIVE_PANE_${agent}" "$pane_id"
+
+        if is_enabled "$background_enabled"; then
+            if [ -z "$state_bg" ]; then
+                :
+            elif [ "$state_bg" = "default" ]; then
+                reset_pane_style "$pane_id"
+            else
+                apply_pane_style "$pane_id" "$state_bg"
+            fi
+        else
+            reset_pane_style "$pane_id"
+        fi
+
+        if is_enabled "$border_enabled"; then
+            if [ -z "$state_border" ]; then
+                :
+            elif [ "$state_border" = "default" ]; then
+                restore_active_border_style "$window_id"
+            else
+                apply_active_border_style "$window_id" "$state_border"
+            fi
+        else
+            restore_active_border_style "$window_id"
+        fi
+
+        apply_window_title_style "$window_id" "$state_title_bg" "$state_title_fg"
+        start_animation
+        ;;
+    needs-input)
+        stop_animation
         clear_window_title_style "$window_id"
         tmux_unset_env "$done_key"
         tmux_unset_env "$done_window_key"
@@ -347,6 +414,7 @@ case "$state" in
         apply_window_title_style "$window_id" "$state_title_bg" "$state_title_fg"
         ;;
     done)
+        stop_animation
         tmux_set_env "$state_key" "done"
         tmux_set_env "$agent_key" "$agent"
         tmux_set_env "$done_key" "1"
@@ -389,6 +457,7 @@ case "$state" in
         fi
         ;;
     off)
+        stop_animation
         clear_window_title_style "$window_id"
         tmux_unset_env "$done_key"
         tmux_unset_env "$done_window_key"

@@ -10,6 +10,26 @@ This guide defines repeatable checks for `tmux-agent-indicator` in automated and
 
 ## Automated Mode (Isolated tmux server)
 
+Preferred: run executable test scripts from `tests/`.
+
+Run all checks:
+
+```bash
+./tests/run-all.sh
+```
+
+Run individual checks:
+
+```bash
+./tests/test-state-transitions.sh
+./tests/test-indicator-output.sh
+./tests/test-focus-reset-done.sh
+./tests/test-window-title-reset.sh
+./tests/test-running-animation.sh
+```
+
+Manual tmux-socket commands (below) are still useful for debugging.
+
 Use a dedicated socket so tests do not affect your normal tmux session:
 
 ```bash
@@ -76,6 +96,50 @@ after_current_style="$(tmux -L "$SOCK" show-window-option -v -t "$WIN" window-st
 echo "PASS: window title styles reset after switching windows"
 ```
 
+Running animation assertion (fails if animation does not tick or cleanup):
+
+```bash
+set -euo pipefail
+tmux -L "$SOCK" set -g @agent-indicator-animation-enabled 'on'
+tmux -L "$SOCK" set -g @agent-indicator-animation-speed '80'
+tmux -L "$SOCK" run-shell "TMUX_PANE=$PANE \"$PWD/scripts/agent-state.sh\" --agent claude --state running"
+
+anim_pid=""
+for _ in $(seq 1 20); do
+  anim_pid="$(tmux -L "$SOCK" show-environment -g TMUX_AGENT_ANIMATION_PID 2>/dev/null | sed 's/^[^=]*=//' || true)"
+  [ -n "$anim_pid" ] && break
+  sleep 0.05
+done
+[ -n "$anim_pid" ] || { echo "FAIL: animation PID was not created"; exit 1; }
+
+first_frame="$(tmux -L "$SOCK" show-environment -g TMUX_AGENT_ANIMATION_FRAME 2>/dev/null | sed 's/^[^=]*=//' || true)"
+[ -n "$first_frame" ] || { echo "FAIL: first animation frame is empty"; exit 1; }
+
+tmux -L "$SOCK" run-shell "TMUX_PANE=$PANE \"$PWD/scripts/indicator.sh\" > /tmp/agent-indicator.out"
+indicator_output="$(cat /tmp/agent-indicator.out)"
+printf '%s' "$indicator_output" | rg -q '━' || { echo "FAIL: indicator bar is missing while running"; exit 1; }
+
+changed=0
+for _ in $(seq 1 20); do
+  sleep 0.1
+  next_frame="$(tmux -L "$SOCK" show-environment -g TMUX_AGENT_ANIMATION_FRAME 2>/dev/null | sed 's/^[^=]*=//' || true)"
+  if [ -n "$next_frame" ] && [ "$next_frame" != "$first_frame" ]; then
+    changed=1
+    break
+  fi
+done
+[ "$changed" -eq 1 ] || { echo "FAIL: animation frame did not change"; exit 1; }
+
+tmux -L "$SOCK" run-shell "TMUX_PANE=$PANE \"$PWD/scripts/agent-state.sh\" --agent claude --state done"
+sleep 0.2
+
+anim_pid_after="$(tmux -L "$SOCK" show-environment -g TMUX_AGENT_ANIMATION_PID 2>/dev/null | sed 's/^[^=]*=//' || true)"
+frame_after="$(tmux -L "$SOCK" show-environment -g TMUX_AGENT_ANIMATION_FRAME 2>/dev/null | sed 's/^[^=]*=//' || true)"
+[ -z "$anim_pid_after" ] || { echo "FAIL: animation PID still present after done"; exit 1; }
+[ -z "$frame_after" ] || { echo "FAIL: animation frame still present after done"; exit 1; }
+echo "PASS: running animation ticks and cleans up"
+```
+
 Cleanup:
 
 ```bash
@@ -91,6 +155,7 @@ rm -f /tmp/agent-indicator.out
 3. Confirm behavior:
    - `running/needs-input/done` apply only configured non-empty properties.
    - `off` resets pane background, border style, and window title style.
+   - With `@agent-indicator-animation-enabled on`, running state animates the status indicator.
    - Switching to another window clears title styling for the previous window (`needs-input` and `done`).
    - With `@agent-indicator-reset-on-focus on`, done pane styling clears when focusing pane/window.
 4. Validate empty-value semantics (`set -g @agent-indicator-done-bg ''` should skip background changes).

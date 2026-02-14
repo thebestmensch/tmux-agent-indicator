@@ -7,6 +7,7 @@ Stateful tmux plugin for AI agent workflows (Claude Code, Codex, and custom wrap
 - Pane visuals by state: `running`, `needs-input`, `done`.
 - Per-agent status icons (for example `claude=🤖`, `codex=🧠`).
 - Window title style markers for `needs-input`/`done`, cleared on focus change.
+- Optional Knight Rider animation during `running` in the status indicator.
 - Optional deferred pane reset: keep pane colors until focus, not when hook fires.
 - Works with both `status-left/right` and `minimal-tmux-status-right`.
 
@@ -74,14 +75,14 @@ set -g @agent-indicator-running-window-title-fg ''
 
 # Needs-input state
 set -g @agent-indicator-needs-input-enabled 'on'
-set -g @agent-indicator-needs-input-bg 'colour94'
+set -g @agent-indicator-needs-input-bg 'default'
 set -g @agent-indicator-needs-input-border 'yellow'
 set -g @agent-indicator-needs-input-window-title-bg 'yellow'
 set -g @agent-indicator-needs-input-window-title-fg 'black'
 
-# Done state (default pane background is green)
+# Done state
 set -g @agent-indicator-done-enabled 'on'
-set -g @agent-indicator-done-bg 'green'
+set -g @agent-indicator-done-bg 'default'
 set -g @agent-indicator-done-border 'green'
 set -g @agent-indicator-done-window-title-bg 'red'
 set -g @agent-indicator-done-window-title-fg 'black'
@@ -94,6 +95,32 @@ set -g @agent-indicator-processes 'claude,codex,aider,cursor,opencode'
 
 # Keep pane colors until pane focus-in after done
 set -g @agent-indicator-reset-on-focus 'on'
+
+# Running animation in status indicator
+set -g @agent-indicator-animation-enabled 'off'
+set -g @agent-indicator-animation-speed '300'
+```
+
+Pane background coloring is unchanged by default (`*-bg 'default'` for all states).
+To enable background colors, set per-state values in your `~/.tmux.conf`, for example:
+
+```tmux
+set -g @agent-indicator-needs-input-bg 'colour94'
+set -g @agent-indicator-done-bg 'green'
+```
+
+Enable animation with defaults:
+
+```tmux
+set -g @agent-indicator-animation-enabled 'on'
+```
+
+That single line is enough. If you do not set `@agent-indicator-animation-speed`, default is `300` ms.
+
+Optional speed override:
+
+```tmux
+set -g @agent-indicator-animation-speed '120'
 ```
 
 ## Tmux Colors

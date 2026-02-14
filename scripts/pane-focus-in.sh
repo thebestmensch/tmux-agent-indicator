@@ -117,6 +117,16 @@ if [ "$window_done" = "1" ] || [ "$state" = "done" ] || [ "$done_marker" = "1" ]
         tmux_unset_env "${pane_prefix}_STATE"
         tmux_unset_env "${pane_prefix}_AGENT"
     done < <(tmux show-environment -g | rg "^TMUX_AGENT_PANE_.*_DONE_WINDOW=${done_window}$" || true)
+
+    # Stop animation if no panes are still running.
+    if ! tmux show-environment -g 2>/dev/null | grep -q '_STATE=running'; then
+        anim_pid=$(tmux_get_env "TMUX_AGENT_ANIMATION_PID")
+        if [ -n "$anim_pid" ] && kill -0 "$anim_pid" 2>/dev/null; then
+            kill "$anim_pid" 2>/dev/null || true
+        fi
+        tmux_unset_env "TMUX_AGENT_ANIMATION_PID"
+        tmux_unset_env "TMUX_AGENT_ANIMATION_FRAME"
+    fi
 fi
 
 tmux refresh-client -S >/dev/null 2>&1 || true

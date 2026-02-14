@@ -64,6 +64,35 @@ icon_for_agent() {
     printf '%s\n' "$default_icon"
 }
 
+is_animation_enabled() {
+    case "$ANIMATION_ENABLED" in
+        on|true|yes|1) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+render_knight_rider() {
+    local frame="$1"
+    local bar_width=7
+    local seg=""
+    local bright="colour196"
+    local trail="colour160"
+    local dim="colour52"
+    local i color
+
+    for (( i = 0; i < bar_width; i++ )); do
+        if [ "$i" -eq "$frame" ]; then
+            color="$bright"
+        elif [ "$i" -eq $((frame - 1)) ] || [ "$i" -eq $((frame + 1)) ]; then
+            color="$trail"
+        else
+            color="$dim"
+        fi
+        seg="${seg}#[fg=${color}]━"
+    done
+    printf '%s#[default]' "$seg"
+}
+
 ICONS=$(tmux show-option -gqv "@agent-indicator-icons")
 if tmux_option_is_set "@agent-indicator-icons" && [ -z "$ICONS" ]; then
     echo ""
@@ -74,6 +103,7 @@ if ! tmux_option_is_set "@agent-indicator-icons" && [ -z "$ICONS" ]; then
 fi
 PROCESSES=$(tmux_get_option_or_default "@agent-indicator-processes" "claude,codex,aider,cursor,opencode")
 INDICATOR_ENABLED=$(tmux_get_option_or_default "@agent-indicator-indicator-enabled" "on")
+ANIMATION_ENABLED=$(tmux_get_option_or_default "@agent-indicator-animation-enabled" "off")
 
 case "$INDICATOR_ENABLED" in
     on|true|yes|1) ;;
@@ -90,9 +120,26 @@ WINDOW_ID=$(tmux display-message -p '#{window_id}')
 STATE=$(tmux_get_env "TMUX_AGENT_PANE_${PANE_ID}_STATE")
 AGENT=$(tmux_get_env "TMUX_AGENT_PANE_${PANE_ID}_AGENT")
 
+output_indicator() {
+    local state="$1"
+    local agent="$2"
+    local icon
+    icon=$(icon_for_agent "$agent" "$ICONS")
+
+    if [ "$state" = "running" ] && is_animation_enabled; then
+        local frame
+        frame=$(tmux_get_env "TMUX_AGENT_ANIMATION_FRAME")
+        if [ -n "$frame" ]; then
+            printf '%s %s\n' "$(render_knight_rider "$frame")" "$icon"
+            return
+        fi
+    fi
+    printf '%s\n' "$icon"
+}
+
 # Method 1: Pane state from hooks/scripts
 if [ -n "$STATE" ] && [ "$STATE" != "off" ]; then
-    icon_for_agent "$AGENT" "$ICONS"
+    output_indicator "$STATE" "$AGENT"
     exit 0
 fi
 
@@ -102,7 +149,7 @@ while IFS=' ' read -r other_pane _ other_active; do
     other_state=$(tmux_get_env "TMUX_AGENT_PANE_${other_pane}_STATE")
     other_agent=$(tmux_get_env "TMUX_AGENT_PANE_${other_pane}_AGENT")
     if [ -n "$other_state" ] && [ "$other_state" != "off" ]; then
-        icon_for_agent "$other_agent" "$ICONS"
+        output_indicator "$other_state" "$other_agent"
         exit 0
     fi
 done < <(tmux list-panes -t "$WINDOW_ID" -F '#{pane_id} #{pane_tty} #{pane_active}')
@@ -114,7 +161,7 @@ if [ -n "$PANE_TTY" ]; then
         proc=$(trim "$proc")
         [ -z "$proc" ] && continue
         # Check if process is running on this TTY
-        if pgrep -t "$(basename "$PANE_TTY")" -f "$proc" >/dev/null 2>&1; then
+        if ps -t "$(basename "$PANE_TTY")" -o command= 2>/dev/null | grep -qw "$proc"; then
             icon_for_agent "$proc" "$ICONS"
             exit 0
         fi
@@ -129,7 +176,7 @@ while IFS=' ' read -r other_pane other_tty other_active; do
     for proc in "${PROC_ARRAY[@]}"; do
         proc=$(trim "$proc")
         [ -z "$proc" ] && continue
-        if pgrep -t "$(basename "$other_tty")" -f "$proc" >/dev/null 2>&1; then
+        if ps -t "$(basename "$other_tty")" -o command= 2>/dev/null | grep -qw "$proc"; then
             icon_for_agent "$proc" "$ICONS"
             exit 0
         fi
