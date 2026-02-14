@@ -3,7 +3,50 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR=""
+TMP_SOURCE_DIR=""
+
+SCRIPT_SOURCE=""
+case "${0:-}" in
+    bash|-bash|sh|-sh)
+        ;;
+    *)
+        SCRIPT_SOURCE="${0}"
+        ;;
+esac
+
+if [ -z "$SCRIPT_SOURCE" ] && [ -n "${BASH_SOURCE+set}" ] && [ "${#BASH_SOURCE[@]}" -gt 0 ]; then
+    SCRIPT_SOURCE="${BASH_SOURCE[0]}"
+fi
+
+if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+fi
+
+if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/agent-indicator.tmux" ]; then
+    INSTALL_REPO="${TMUX_AGENT_INSTALL_REPO:-accessd/tmux-agent-indicator}"
+    INSTALL_REF="${TMUX_AGENT_INSTALL_REF:-main}"
+    ARCHIVE_URL="https://codeload.github.com/${INSTALL_REPO}/tar.gz/refs/heads/${INSTALL_REF}"
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "curl is required for stdin-based installation" >&2
+        exit 1
+    fi
+    if ! command -v tar >/dev/null 2>&1; then
+        echo "tar is required for stdin-based installation" >&2
+        exit 1
+    fi
+
+    TMP_SOURCE_DIR="$(mktemp -d)"
+    trap 'rm -rf "$TMP_SOURCE_DIR"' EXIT
+    curl -fsSL "$ARCHIVE_URL" | tar -xz -C "$TMP_SOURCE_DIR"
+    SCRIPT_DIR="$(find "$TMP_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+
+    if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/agent-indicator.tmux" ]; then
+        echo "Failed to fetch installer sources from $ARCHIVE_URL" >&2
+        exit 1
+    fi
+fi
 TARGET_DIR="${TMUX_AGENT_INSTALL_DIR:-$HOME/.tmux/plugins/tmux-agent-indicator}"
 INSTALL_CLAUDE=true
 INSTALL_CODEX=true
