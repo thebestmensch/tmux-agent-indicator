@@ -31,9 +31,10 @@ Integration uninstall options:
 
 ### TPM
 
+Add to ~/.tmux.conf:
+
 ```tmux
 set -g @plugin 'accessd/tmux-agent-indicator'
-run-shell '~/.tmux/plugins/tmux-agent-indicator/agent-indicator.tmux'
 ```
 
 Reload tmux:
