@@ -8,9 +8,9 @@ https://github.com/user-attachments/assets/b6b6b466-4b42-4d45-85aa-b9b659e4bafe
 
 When the agent finishes, the window title background/foreground changes and the pane border updates to signal completion.
 
-| ![needs-input](docs/images/needs-input.png) | ![done](docs/images/done.png) |
-|:---:|:---:|
-| needs-input: yellow window title | done: red window title |
+| ![needs-input](docs/images/needs-input.png) | ![done](docs/images/done.png) | ![done-pane-bg](docs/images/done-pane-bg.png) |
+|:---:|:---:|:---:|
+| needs-input: yellow window title | done: red window title | done: pane background change |
 
 ## How it works
 

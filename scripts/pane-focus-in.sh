@@ -96,9 +96,11 @@ fi
 done_window_done_key="TMUX_AGENT_WINDOW_${done_window}_DONE"
 done_window_border_key="TMUX_AGENT_WINDOW_${done_window}_ORIG_ACTIVE_BORDER_STYLE"
 
-# Needs-input title style is cleared only when focus returns to the source pane/window.
+# Needs-input visuals are cleared when focus returns to the source pane/window.
 if [ "$state" = "needs-input" ]; then
     restore_window_title_style "$window_id"
+    tmux select-pane -t "$pane_id" -P "bg=default"
+    restore_window_option "$window_id" "pane-active-border-style" "$window_border_key"
 fi
 
 if [ "$window_done" = "1" ] || [ "$state" = "done" ] || [ "$done_marker" = "1" ]; then
