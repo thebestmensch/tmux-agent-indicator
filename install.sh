@@ -178,18 +178,26 @@ for event in list(hooks.keys()):
         hooks.pop(event, None)
 
 events = {
-    "UserPromptSubmit": f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state running",
-    "PermissionRequest": f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state needs-input",
-    "Stop": f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state done",
+    "UserPromptSubmit": [
+        f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state off",
+        f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state running",
+    ],
+    "PermissionRequest": [
+        f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state needs-input",
+    ],
+    "Stop": [
+        f"\"${{TMUX_AGENT_INDICATOR_DIR:-{target_dir}}}\"/scripts/agent-state.sh --agent claude --state done",
+    ],
 }
 
 if mode == "install":
-    for event, command in events.items():
+    for event, commands in events.items():
         entries = hooks.get(event, [])
-        entries.append({
-            "matcher": "",
-            "hooks": [{"type": "command", "command": command}],
-        })
+        for command in commands:
+            entries.append({
+                "matcher": "",
+                "hooks": [{"type": "command", "command": command}],
+            })
         hooks[event] = entries
 
 settings["hooks"] = hooks
