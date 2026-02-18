@@ -32,6 +32,7 @@ States reset when you focus the pane/window, or on the next transition.
 - Knight Rider animation during `running` state
 - Deferred pane reset: keep pane colors until focus, not when the hook fires
 - Process detection fallback for agents that don't fire hooks
+- Tmux display-message notifications on state transitions
 
 ## Requirements
 
@@ -151,6 +152,13 @@ set -g @agent-indicator-reset-on-focus 'on'
 # Running animation in status indicator
 set -g @agent-indicator-animation-enabled 'off'
 set -g @agent-indicator-animation-speed '300'
+
+# Notifications (tmux display-message on state transitions)
+set -g @agent-indicator-notification-enabled 'on'
+set -g @agent-indicator-notification-states 'needs-input,done'
+set -g @agent-indicator-notification-format '[#{agent_name}] #{agent_state} (#{session_name}:#{window_name})'
+set -g @agent-indicator-notification-duration '5000'
+set -g @agent-indicator-notification-command ''
 ```
 
 Pane background coloring is unchanged by default (`*-bg 'default'` for all states).
@@ -229,6 +237,36 @@ Tmux supports:
 ![Tmux color chart](docs/assets/tmux-colors.png)
 
 </details>
+
+## Notifications
+
+State transitions trigger a `tmux display-message` notification. Enabled by default for `needs-input` and `done` states.
+
+```tmux
+# Disable notifications entirely
+set -g @agent-indicator-notification-enabled 'off'
+
+# Only notify on done
+set -g @agent-indicator-notification-states 'done'
+
+# Custom format
+set -g @agent-indicator-notification-format '#{agent_name} is #{agent_state} in #{session_name}'
+
+# Duration in milliseconds (0 = use tmux default display-time)
+set -g @agent-indicator-notification-duration '3000'
+```
+
+Available format placeholders: `#{agent_name}`, `#{agent_state}`, `#{session_name}`, `#{window_name}`, `#{window_index}`.
+
+You can also run an external command on each notification. The command receives environment variables `AGENT_NAME`, `AGENT_STATE`, `AGENT_SESSION`, and `AGENT_WINDOW`:
+
+```tmux
+# Log notifications to a file
+set -g @agent-indicator-notification-command 'echo "$AGENT_NAME $AGENT_STATE" >> /tmp/agent-notify.log'
+
+# macOS system notification
+set -g @agent-indicator-notification-command 'osascript -e "display notification \"$AGENT_NAME is $AGENT_STATE\" with title \"tmux agent\""'
+```
 
 ## Custom Agent Integration
 
