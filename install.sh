@@ -50,8 +50,10 @@ fi
 TARGET_DIR="${TMUX_AGENT_INSTALL_DIR:-$HOME/.tmux/plugins/tmux-agent-indicator}"
 INSTALL_CLAUDE=true
 INSTALL_CODEX=true
+INSTALL_OPENCODE=true
 UNINSTALL_CLAUDE=false
 UNINSTALL_CODEX=false
+UNINSTALL_OPENCODE=false
 
 usage() {
     cat <<'EOF'
@@ -61,8 +63,10 @@ Options:
   --target-dir <path>  Install path (default: ~/.tmux/plugins/tmux-agent-indicator)
   --no-claude          Skip Claude hooks setup
   --no-codex           Skip Codex notify setup
+  --no-opencode        Skip OpenCode plugin setup
   --uninstall-claude   Remove tmux-agent-indicator Claude hooks from ~/.claude/settings.json
   --uninstall-codex    Remove tmux-agent-indicator Codex notify from ~/.codex/config.toml
+  --uninstall-opencode Remove tmux-agent-indicator OpenCode plugin from ~/.config/opencode/plugins/
   -h, --help           Show this help
 EOF
 }
@@ -82,6 +86,10 @@ while [ "$#" -gt 0 ]; do
             INSTALL_CODEX=false
             shift
             ;;
+        --no-opencode)
+            INSTALL_OPENCODE=false
+            shift
+            ;;
         --uninstall-claude)
             UNINSTALL_CLAUDE=true
             INSTALL_CLAUDE=false
@@ -90,6 +98,11 @@ while [ "$#" -gt 0 ]; do
         --uninstall-codex)
             UNINSTALL_CODEX=true
             INSTALL_CODEX=false
+            shift
+            ;;
+        --uninstall-opencode)
+            UNINSTALL_OPENCODE=true
+            INSTALL_OPENCODE=false
             shift
             ;;
         -h|--help)
@@ -104,7 +117,32 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-mkdir -p "$TARGET_DIR/scripts" "$TARGET_DIR/hooks" "$TARGET_DIR/adapters"
+# Auto-detect agents: skip integration if agent not found on system
+if [ "$INSTALL_CLAUDE" = true ] && [ "$UNINSTALL_CLAUDE" = false ]; then
+    CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+    if ! command -v claude >/dev/null 2>&1 && [ ! -d "$CLAUDE_DIR" ]; then
+        INSTALL_CLAUDE=false
+        echo "Claude not detected, skipping hooks setup"
+    fi
+fi
+
+if [ "$INSTALL_CODEX" = true ] && [ "$UNINSTALL_CODEX" = false ]; then
+    CODEX_DIR="${CODEX_CONFIG_DIR:-$HOME/.codex}"
+    if ! command -v codex >/dev/null 2>&1 && [ ! -d "$CODEX_DIR" ]; then
+        INSTALL_CODEX=false
+        echo "Codex not detected, skipping notify setup"
+    fi
+fi
+
+if [ "$INSTALL_OPENCODE" = true ] && [ "$UNINSTALL_OPENCODE" = false ]; then
+    OPENCODE_CFG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+    if ! command -v opencode >/dev/null 2>&1 && [ ! -d "$OPENCODE_CFG_DIR" ]; then
+        INSTALL_OPENCODE=false
+        echo "OpenCode not detected, skipping plugin setup"
+    fi
+fi
+
+mkdir -p "$TARGET_DIR/scripts" "$TARGET_DIR/hooks" "$TARGET_DIR/adapters" "$TARGET_DIR/plugins"
 
 cp "$SCRIPT_DIR/agent-indicator.tmux" "$TARGET_DIR/"
 cp "$SCRIPT_DIR/README.md" "$TARGET_DIR/"
@@ -112,6 +150,7 @@ cp "$SCRIPT_DIR/LICENSE" "$TARGET_DIR/"
 cp "$SCRIPT_DIR/scripts/"*.sh "$TARGET_DIR/scripts/"
 cp "$SCRIPT_DIR/hooks/"*.json "$TARGET_DIR/hooks/"
 cp "$SCRIPT_DIR/adapters/"*.sh "$TARGET_DIR/adapters/"
+cp "$SCRIPT_DIR/plugins/"*.js "$TARGET_DIR/plugins/"
 cp "$SCRIPT_DIR/setup.sh" "$TARGET_DIR/"
 
 chmod +x "$TARGET_DIR/agent-indicator.tmux" "$TARGET_DIR/scripts/"*.sh "$TARGET_DIR/adapters/"*.sh "$TARGET_DIR/setup.sh"
@@ -122,6 +161,11 @@ if [ "$INSTALL_CLAUDE" = true ] || [ "$UNINSTALL_CLAUDE" = true ]; then
     mkdir -p "$CLAUDE_DIR"
     if [ ! -f "$CLAUDE_SETTINGS" ] && [ "$INSTALL_CLAUDE" = true ]; then
         printf '{}\n' > "$CLAUDE_SETTINGS"
+    fi
+
+    if [ "$INSTALL_CLAUDE" = true ]; then
+        echo "Claude detected"
+        echo "  Hooks -> $CLAUDE_SETTINGS (UserPromptSubmit, PermissionRequest, Stop)"
     fi
 
     if [ -f "$CLAUDE_SETTINGS" ]; then
@@ -212,6 +256,11 @@ if [ "$INSTALL_CODEX" = true ] || [ "$UNINSTALL_CODEX" = true ]; then
     CODEX_CONFIG="$CODEX_DIR/config.toml"
     mkdir -p "$CODEX_DIR"
 
+    if [ "$INSTALL_CODEX" = true ]; then
+        echo "Codex detected"
+        echo "  Notify -> $CODEX_CONFIG"
+    fi
+
     python3 - "$CODEX_CONFIG" "$TARGET_DIR" "$UNINSTALL_CODEX" <<'PY'
 import pathlib
 import re
@@ -245,6 +294,21 @@ config_path.write_text(text, encoding="utf-8")
 PY
 fi
 
+OPENCODE_PLUGIN_NAME="opencode-tmux-agent-indicator.js"
+
+if [ "$INSTALL_OPENCODE" = true ]; then
+    OPENCODE_PLUGINS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins"
+    echo "OpenCode detected"
+    echo "  Plugin -> $OPENCODE_PLUGINS_DIR/$OPENCODE_PLUGIN_NAME"
+    mkdir -p "$OPENCODE_PLUGINS_DIR"
+    cp "$TARGET_DIR/plugins/$OPENCODE_PLUGIN_NAME" "$OPENCODE_PLUGINS_DIR/$OPENCODE_PLUGIN_NAME"
+fi
+
+if [ "$UNINSTALL_OPENCODE" = true ]; then
+    OPENCODE_PLUGINS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins"
+    rm -f "$OPENCODE_PLUGINS_DIR/$OPENCODE_PLUGIN_NAME"
+fi
+
 cat <<EOF
 Installed/updated tmux-agent-indicator in:
   $TARGET_DIR
@@ -271,6 +335,10 @@ fi
 
 if [ "$UNINSTALL_CODEX" = true ]; then
     echo "Removed tmux-agent-indicator Codex notify from: ${CODEX_CONFIG_DIR:-$HOME/.codex}/config.toml"
+fi
+
+if [ "$UNINSTALL_OPENCODE" = true ]; then
+    echo "Removed tmux-agent-indicator OpenCode plugin from: ${XDG_CONFIG_HOME:-$HOME/.config}/opencode/plugins/"
 fi
 
 if [[ -t 0 ]]; then

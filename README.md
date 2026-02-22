@@ -16,7 +16,7 @@ When the agent finishes, the window title background/foreground changes and the 
 
 The plugin tracks three states per pane: `running`, `needs-input`, and `done`.
 
-State transitions are driven by hooks. Claude Code fires hooks on prompt submit, permission request, and stop. Codex uses its `notify` command. Any other agent can call `agent-state.sh` directly from a wrapper script or hook.
+State transitions are driven by hooks. Claude Code fires hooks on prompt submit, permission request, and stop. Codex uses its `notify` command. OpenCode uses its plugin system. Any other agent can call `agent-state.sh` directly from a wrapper script or hook.
 
 Each state can change:
 - Pane border color
@@ -55,12 +55,14 @@ bash ~/.tmux/plugins/tmux-agent-indicator/setup.sh
 This installs files to `~/.tmux/plugins/tmux-agent-indicator` and updates:
 - `~/.claude/settings.json` hooks for Claude (`UserPromptSubmit`, `PermissionRequest`, `Stop`)
 - `~/.codex/config.toml` `notify` command for Codex
+- `~/.config/opencode/plugins/` plugin for OpenCode
 
 Integration uninstall options:
 
 ```bash
 ./install.sh --uninstall-claude
 ./install.sh --uninstall-codex
+./install.sh --uninstall-opencode
 ```
 
 ### TPM
@@ -101,7 +103,7 @@ set -g @agent-indicator-border-enabled 'on'
 set -g @agent-indicator-indicator-enabled 'on'
 
 # Per-agent icons
-set -g @agent-indicator-icons 'claude=🤖,codex=🧠,default=🤖'
+set -g @agent-indicator-icons 'claude=🤖,codex=🧠,opencode=💻,default=🤖'
 
 # Keep pane colors until you focus the pane (instead of clearing immediately)
 set -g @agent-indicator-reset-on-focus 'on'
@@ -141,7 +143,7 @@ set -g @agent-indicator-done-window-title-bg 'red'
 set -g @agent-indicator-done-window-title-fg 'black'
 
 # Per-agent icons
-set -g @agent-indicator-icons 'claude=🤖,codex=🧠,default=🤖'
+set -g @agent-indicator-icons 'claude=🤖,codex=🧠,opencode=💻,default=🤖'
 
 # Process fallback detection
 set -g @agent-indicator-processes 'claude,codex,aider,cursor,opencode'
@@ -288,6 +290,20 @@ It maps:
 - `UserPromptSubmit` -> `running`
 - `PermissionRequest` -> `needs-input`
 - `Stop` -> `done`
+
+## OpenCode Plugin
+
+The installer copies `plugins/opencode-tmux-agent-indicator.js` to `~/.config/opencode/plugins/`. The plugin uses OpenCode's event system:
+- `session.status` (busy) -> `running`
+- `permission.updated` -> `needs-input`
+- `session.idle` -> `done`
+
+To install manually without the installer, copy the plugin file:
+
+```bash
+mkdir -p ~/.config/opencode/plugins
+cp plugins/opencode-tmux-agent-indicator.js ~/.config/opencode/plugins/
+```
 
 ## License
 

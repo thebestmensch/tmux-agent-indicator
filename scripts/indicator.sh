@@ -99,7 +99,7 @@ if tmux_option_is_set "@agent-indicator-icons" && [ -z "$ICONS" ]; then
     exit 0
 fi
 if ! tmux_option_is_set "@agent-indicator-icons" && [ -z "$ICONS" ]; then
-    ICONS="claude=🤖,codex=🧠,default=🤖"
+    ICONS="claude=🤖,codex=🧠,opencode=💻,default=🤖"
 fi
 PROCESSES=$(tmux_get_option_or_default "@agent-indicator-processes" "claude,codex,aider,cursor,opencode")
 INDICATOR_ENABLED=$(tmux_get_option_or_default "@agent-indicator-indicator-enabled" "on")
