@@ -3,16 +3,11 @@
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-agent_indicator_interpolation=(
-    "\#{agent_indicator}"
-    "#($CURRENT_DIR/scripts/indicator.sh)"
-)
-
 do_interpolation() {
     local string="$1"
-    local search="${agent_indicator_interpolation[0]}"
-    local replace="${agent_indicator_interpolation[1]}"
-    echo "${string//$search/$replace}"
+    string="${string//\#\{agent_indicator\}/#($CURRENT_DIR/scripts/indicator.sh)}"
+    string="${string//\#\{agent_session_dots\}/#($CURRENT_DIR/scripts/session-dots.sh '#S')}"
+    echo "$string"
 }
 
 update_tmux_option() {
@@ -28,17 +23,17 @@ update_tmux_option() {
 register_hook_once() {
     local hook_type="$1"
     local command="$2"
-    local hook_script="$CURRENT_DIR/scripts/pane-focus-in.sh"
+    local match="${3:-$CURRENT_DIR}"
     local existing_hooks
     existing_hooks=$(tmux show-hooks -g "$hook_type" 2>/dev/null || true)
 
-    # Remove previously registered plugin hooks to avoid duplicates.
+    # Remove all previously registered plugin hooks to avoid duplicates.
     while IFS= read -r line; do
         [ -z "$line" ] && continue
         local existing_name
         existing_name="${line%% *}"
         tmux set-hook -gu "$existing_name" 2>/dev/null || true
-    done < <(printf '%s\n' "$existing_hooks" | grep -F "$hook_script" || true)
+    done < <(printf '%s\n' "$existing_hooks" | grep -F "$match" || true)
 
     tmux set-hook -ag "$hook_type" "$command"
 }
@@ -56,7 +51,12 @@ main() {
     update_tmux_option "status-right"
     update_tmux_option "status-left"
     update_tmux_option "@minimal-tmux-status-right"
+    update_tmux_option "@minimal-tmux-status-left"
+    update_tmux_option "@minimal-tmux-status-right-extra"
+    update_tmux_option "@minimal-tmux-status-left-extra"
     register_focus_hooks
+    local session_script="$CURRENT_DIR/scripts/session-changed.sh"
+    register_hook_once "client-session-changed" "run-shell \"$session_script\""
 }
 
 main

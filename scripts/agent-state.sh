@@ -372,6 +372,12 @@ window_id=$(tmux display-message -p -t "$pane_id" '#{window_id}')
 active_window_id=$(tmux display-message -p '#{window_id}')
 active_pane_id=$(tmux display-message -p '#{pane_id}')
 
+# Clear session-dots seen marker so new attention is visible
+pane_session=$(tmux display-message -p -t "$pane_id" '#{session_name}' 2>/dev/null || true)
+if [ -n "$pane_session" ]; then
+    tmux_unset_env "TMUX_AGENT_SESSION_SEEN_${pane_session}"
+fi
+
 background_enabled=$(tmux_get_option_or_default "@agent-indicator-background-enabled" "on")
 border_enabled=$(tmux_get_option_or_default "@agent-indicator-border-enabled" "on")
 reset_on_focus=$(tmux_get_option_or_default "@agent-indicator-reset-on-focus" "on")

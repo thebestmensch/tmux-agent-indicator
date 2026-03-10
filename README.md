@@ -93,6 +93,37 @@ For [minimal-tmux-status](https://github.com/niksingh710/minimal-tmux-status):
 set -g @minimal-tmux-status-right '#{agent_indicator} #(gitmux "#{pane_current_path}")'
 ```
 
+## Session Dots
+
+Optional visual session indicator in the status bar. Shows all sessions as symbols with the current one highlighted. Sessions where agents need attention (`needs-input` or `done` state) are highlighted in a different color.
+
+Example with 4 sessions, second is current, fourth needs attention: `○●○●`
+
+Add `#{agent_session_dots}` to your status bar:
+
+```tmux
+set -g status-right '#{agent_session_dots} #{agent_indicator} | %H:%M'
+```
+
+Configuration:
+
+```tmux
+# Symbols
+set -g @agent-indicator-session-dots-active '●'
+set -g @agent-indicator-session-dots-inactive '○'
+set -g @agent-indicator-session-dots-attention '●'
+
+# Colors (empty = inherit from status bar)
+set -g @agent-indicator-session-dots-color ''
+set -g @agent-indicator-session-dots-active-color ''
+set -g @agent-indicator-session-dots-attention-color 'yellow'
+
+# Which agent states trigger attention highlighting (comma-separated)
+set -g @agent-indicator-session-dots-attention-states 'needs-input,done'
+```
+
+The current session always shows as the active dot, even if it also has agents needing attention.
+
 ## Configuration
 
 Quick start with the most useful options:
@@ -161,6 +192,15 @@ set -g @agent-indicator-notification-states 'needs-input,done'
 set -g @agent-indicator-notification-format '[#{agent_name}] #{agent_state} (#{session_name}:#{window_name})'
 set -g @agent-indicator-notification-duration '5000'
 set -g @agent-indicator-notification-command ''
+
+# Session dots (visual session indicator in status bar)
+set -g @agent-indicator-session-dots-active '●'
+set -g @agent-indicator-session-dots-inactive '○'
+set -g @agent-indicator-session-dots-attention '●'
+set -g @agent-indicator-session-dots-color ''
+set -g @agent-indicator-session-dots-active-color ''
+set -g @agent-indicator-session-dots-attention-color 'yellow'
+set -g @agent-indicator-session-dots-attention-states 'needs-input,done'
 ```
 
 Pane background coloring is unchanged by default (`*-bg 'default'` for all states).
