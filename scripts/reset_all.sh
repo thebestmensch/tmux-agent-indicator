@@ -51,7 +51,7 @@ tmux_unset_env "TMUX_AGENT_ANIMATION_FRAME"
 active_pane=$(tmux display-message -p '#{pane_id}')
 while IFS= read -r pane_id; do
     [ -z "$pane_id" ] && continue
-    tmux select-pane -t "$pane_id" -P "bg=default" 2>/dev/null || true
+    tmux select-pane -t "$pane_id" -P '' 2>/dev/null || true
 done < <(tmux list-panes -a -F '#{pane_id}')
 tmux select-pane -t "$active_pane" 2>/dev/null || true
 
