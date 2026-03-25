@@ -178,7 +178,8 @@ reset_pane_style() {
     local pane_id="$1"
     local active
     active=$(tmux display-message -p '#{pane_id}')
-    tmux select-pane -t "$pane_id" -P "bg=default"
+    # Clear per-pane override so it inherits from window-style (inactive bg)
+    tmux select-pane -t "$pane_id" -P ''
     if [ "$pane_id" != "$active" ]; then
         tmux select-pane -t "$active"
     fi

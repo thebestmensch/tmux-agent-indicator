@@ -75,9 +75,9 @@ render_knight_rider() {
     local frame="$1"
     local bar_width=7
     local seg=""
-    local bright="colour196"
-    local trail="colour160"
-    local dim="colour52"
+    local bright="colour183"
+    local trail="colour141"
+    local dim="colour60"
     local i color
 
     for (( i = 0; i < bar_width; i++ )); do
@@ -90,7 +90,7 @@ render_knight_rider() {
         fi
         seg="${seg}#[fg=${color}]━"
     done
-    printf '%s#[default]' "$seg"
+    printf '%s#[fg=#ebdbb2]' "$seg"
 }
 
 ICONS=$(tmux show-option -gqv "@agent-indicator-icons")
