@@ -47,13 +47,26 @@ fi
 tmux_unset_env "TMUX_AGENT_ANIMATION_PID"
 tmux_unset_env "TMUX_AGENT_ANIMATION_FRAME"
 
-# Reset all pane backgrounds
-active_pane=$(tmux display-message -p '#{pane_id}')
-while IFS= read -r pane_id; do
-    [ -z "$pane_id" ] && continue
-    tmux select-pane -t "$pane_id" -P '' 2>/dev/null || true
-done < <(tmux list-panes -a -F '#{pane_id}')
-tmux select-pane -t "$active_pane" 2>/dev/null || true
+is_enabled() {
+    case "$1" in on|yes|true|1) return 0 ;; *) return 1 ;; esac
+}
+
+background_enabled=$(tmux_get_env "@agent-indicator-background-enabled")
+if [ -z "$background_enabled" ]; then
+    background_enabled=$(tmux show-option -gqv "@agent-indicator-background-enabled" 2>/dev/null || true)
+fi
+: "${background_enabled:=on}"
+
+# Reset all pane backgrounds (only if the plugin was managing them)
+if is_enabled "$background_enabled"; then
+    active_pane=$(tmux display-message -p '#{pane_id}')
+    while IFS= read -r pane_id; do
+        [ -z "$pane_id" ] && continue
+        tmux set-option -p -t "$pane_id" -u window-style 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" -u window-active-style 2>/dev/null || true
+    done < <(tmux list-panes -a -F '#{pane_id}')
+    tmux select-pane -t "$active_pane" 2>/dev/null || true
+fi
 
 # Restore saved window options and reset borders
 while IFS= read -r window_id; do

@@ -176,23 +176,18 @@ restore_active_border_style() {
 
 reset_pane_style() {
     local pane_id="$1"
-    local active
-    active=$(tmux display-message -p '#{pane_id}')
-    if [ "$pane_id" = "$active" ]; then
-        tmux select-pane -t "$pane_id" -P ''
-    fi
-    # Non-active panes: skip select-pane entirely to avoid focus stealing.
-    # pane-focus-in.sh handles cleanup when the pane regains focus.
+    # Unset per-pane overrides so global window-style/window-active-style take effect.
+    # Do NOT use `select-pane -P ''` — that sets an explicit empty style which
+    # overrides globals rather than falling through to them.
+    tmux set-option -p -t "$pane_id" -u window-style 2>/dev/null || true
+    tmux set-option -p -t "$pane_id" -u window-active-style 2>/dev/null || true
 }
 
 apply_pane_style() {
     local pane_id="$1"
     local bg="$2"
-    local active
-    active=$(tmux display-message -p '#{pane_id}')
-    if [ "$pane_id" = "$active" ]; then
-        tmux select-pane -t "$pane_id" -P "bg=$bg"
-    fi
+    tmux set-option -p -t "$pane_id" window-style "bg=$bg" 2>/dev/null || true
+    tmux set-option -p -t "$pane_id" window-active-style "bg=$bg" 2>/dev/null || true
 }
 
 pane_exists() {
@@ -423,8 +418,6 @@ case "$state" in
                 else
                     apply_pane_style "$pane_id" "$state_bg"
                 fi
-            else
-                reset_pane_style "$pane_id"
             fi
         fi
 
@@ -465,8 +458,6 @@ case "$state" in
                 else
                     apply_pane_style "$pane_id" "$state_bg"
                 fi
-            else
-                reset_pane_style "$pane_id"
             fi
         fi
 
@@ -526,7 +517,9 @@ case "$state" in
             tmux_set_env "$pending_reset_key" "1"
         else
             tmux_unset_env "$pending_reset_key"
-            reset_pane_style "$pane_id"
+            if is_enabled "$background_enabled"; then
+                reset_pane_style "$pane_id"
+            fi
             restore_active_border_style "$window_id"
             clear_window_title_style "$window_id"
             tmux_unset_env "$done_key"
@@ -544,7 +537,9 @@ case "$state" in
         tmux_unset_env "$state_key"
         tmux_unset_env "$agent_key"
         tmux_unset_env "TMUX_AGENT_ACTIVE_PANE_${agent}"
-        reset_pane_style "$pane_id"
+        if is_enabled "$background_enabled"; then
+            reset_pane_style "$pane_id"
+        fi
         restore_active_border_style "$window_id"
         ;;
 esac

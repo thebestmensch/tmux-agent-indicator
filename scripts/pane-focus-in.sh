@@ -56,6 +56,24 @@ restore_window_title_style() {
     tmux_unset_env "$window_done_key"
 }
 
+tmux_get_option_or_default() {
+    local option="$1"
+    local default="$2"
+    local value
+    value=$(tmux show-option -gqv "$option" 2>/dev/null || true)
+    if [ -z "$value" ]; then
+        printf '%s' "$default"
+    else
+        printf '%s' "$value"
+    fi
+}
+
+is_enabled() {
+    case "$1" in on|yes|true|1) return 0 ;; *) return 1 ;; esac
+}
+
+background_enabled=$(tmux_get_option_or_default "@agent-indicator-background-enabled" "on")
+
 pane_id="${1:-}"
 window_id="${2:-}"
 if [ -z "$pane_id" ]; then
@@ -81,7 +99,10 @@ window_border_key="TMUX_AGENT_WINDOW_${window_id}_ORIG_ACTIVE_BORDER_STYLE"
 
 pending_reset=$(tmux_get_env "$pending_reset_key")
 if [ "$pending_reset" = "1" ]; then
-    tmux select-pane -t "$pane_id" -P ''
+    if is_enabled "$background_enabled"; then
+        tmux set-option -p -t "$pane_id" -u window-style 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" -u window-active-style 2>/dev/null || true
+    fi
     restore_window_option "$window_id" "pane-active-border-style" "$window_border_key"
     tmux_unset_env "$pending_reset_key"
 fi
@@ -99,7 +120,10 @@ done_window_border_key="TMUX_AGENT_WINDOW_${done_window}_ORIG_ACTIVE_BORDER_STYL
 # Needs-input visuals are cleared when focus returns to the source pane/window.
 if [ "$state" = "needs-input" ]; then
     restore_window_title_style "$window_id"
-    tmux select-pane -t "$pane_id" -P ''
+    if is_enabled "$background_enabled"; then
+        tmux set-option -p -t "$pane_id" -u window-style 2>/dev/null || true
+        tmux set-option -p -t "$pane_id" -u window-active-style 2>/dev/null || true
+    fi
     restore_window_option "$window_id" "pane-active-border-style" "$window_border_key"
 fi
 
